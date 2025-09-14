@@ -1,0 +1,83 @@
+2025-09-14 10:54:33,471 - __main__ - INFO - Запуск OCR Quality Assessment API v1.0.0
+2025-09-14 10:54:33,471 - __main__ - INFO - Сервер будет доступен по адресу: http://0.0.0.0:8000
+2025-09-14 10:54:33,471 - __main__ - INFO - Режим отладки: False
+2025-09-14 10:54:33,471 - __main__ - INFO - Языки OCR: ['ru', 'en']
+2025-09-14 10:54:33,471 - __main__ - INFO - GPU для OCR: False
+2025-09-14 10:55:07,671 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 10:55:07,681 - easyocr.easyocr - WARNING - Downloading detection model, please wait. This may take several minutes depending upon your network connection.
+2025-09-14 10:55:07,752 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 10:55:07,752 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 10:55:07,752 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 10:55:07,752 - easyocr.easyocr - WARNING - Downloading detection model, please wait. This may take several minutes depending upon your network connection.
+2025-09-14 10:55:07,752 - easyocr.easyocr - WARNING - Downloading detection model, please wait. This may take several minutes depending upon your network connection.
+2025-09-14 10:55:07,752 - easyocr.easyocr - WARNING - Downloading detection model, please wait. This may take several minutes depending upon your network connection.
+2025-09-14 10:55:33,877 - ocr_service - ERROR - Ошибка инициализации EasyOCR: [WinError 32] Процесс не может получить доступ к файлу, так как этот файл занят другим процессом: 'C:\\Users\\student/.EasyOCR//model\\temp.zip'
+2025-09-14 10:55:34,047 - ocr_service - ERROR - Ошибка инициализации EasyOCR: [WinError 32] Процесс не может получить доступ к файлу, так как этот файл занят другим процессом: 'C:\\Users\\student/.EasyOCR//model\\temp.zip'
+2025-09-14 10:55:41,222 - ocr_service - ERROR - Ошибка инициализации EasyOCR: [WinError 32] Процесс не может получить доступ к файлу, так как этот файл занят другим процессом: 'C:\\Users\\student/.EasyOCR//model\\temp.zip'
+2025-09-14 10:55:45,519 - easyocr.easyocr - INFO - Download complete
+2025-09-14 10:55:45,519 - easyocr.easyocr - WARNING - Downloading recognition model, please wait. This may take several minutes depending upon your network connection.
+2025-09-14 10:55:48,397 - easyocr.easyocr - INFO - Download complete.
+2025-09-14 10:55:50,541 - ocr_service - INFO - EasyOCR инициализирован для языков: ['ru', 'en']
+2025-09-14 10:58:26,432 - __main__ - INFO - Запуск OCR Quality Assessment API v1.0.0
+2025-09-14 10:58:26,432 - __main__ - INFO - Сервер будет доступен по адресу: http://0.0.0.0:8000
+2025-09-14 10:58:26,432 - __main__ - INFO - Режим отладки: False
+2025-09-14 10:58:26,432 - __main__ - INFO - Языки OCR: ['ru', 'en']
+2025-09-14 10:58:26,432 - __main__ - INFO - GPU для OCR: False
+2025-09-14 10:58:32,068 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 10:58:32,068 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 10:58:32,068 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 10:58:32,092 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 10:59:48,767 - ocr_service - INFO - EasyOCR инициализирован для языков: ['ru', 'en']
+2025-09-14 11:00:58,365 - ocr_service - ERROR - Ошибка конвертации байтов в изображение: cannot identify image file <_io.BytesIO object at 0x00000186BC2FEE30>
+2025-09-14 11:00:58,365 - ocr_service - ERROR - Ошибка при извлечении текста: cannot identify image file <_io.BytesIO object at 0x00000186BC2FEE30>
+2025-09-14 11:00:58,365 - main - ERROR - Ошибка при обработке документа: cannot identify image file <_io.BytesIO object at 0x00000186BC2FEE30>
+2025-09-14 11:01:57,769 - __main__ - INFO - Запуск OCR Quality Assessment API v1.0.0
+2025-09-14 11:01:57,769 - __main__ - INFO - Сервер будет доступен по адресу: http://0.0.0.0:8000
+2025-09-14 11:01:57,859 - __main__ - INFO - Режим отладки: False
+2025-09-14 11:01:57,859 - __main__ - INFO - Языки OCR: ['ru', 'en']
+2025-09-14 11:01:57,859 - __main__ - INFO - GPU для OCR: False
+2025-09-14 11:02:48,319 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 11:02:50,712 - ocr_service - INFO - EasyOCR инициализирован для языков: ['ru', 'en']
+2025-09-14 11:03:25,939 - main - ERROR - Ошибка при обработке документа: 
+2025-09-14 11:03:33,594 - main - ERROR - Ошибка при обработке документа: 
+2025-09-14 11:04:12,625 - main - ERROR - Ошибка при обработке документа: 
+2025-09-14 11:05:02,524 - __main__ - INFO - Запуск OCR Quality Assessment API v1.0.0
+2025-09-14 11:05:02,525 - __main__ - INFO - Сервер будет доступен по адресу: http://0.0.0.0:8000
+2025-09-14 11:05:02,525 - __main__ - INFO - Режим отладки: False
+2025-09-14 11:05:02,525 - __main__ - INFO - Языки OCR: ['ru', 'en']
+2025-09-14 11:05:02,525 - __main__ - INFO - GPU для OCR: False
+2025-09-14 11:05:06,621 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 11:05:08,640 - ocr_service - INFO - EasyOCR инициализирован для языков: ['ru', 'en']
+2025-09-14 11:05:14,253 - __main__ - INFO - Запуск OCR Quality Assessment API v1.0.0
+2025-09-14 11:05:14,253 - __main__ - INFO - Сервер будет доступен по адресу: http://0.0.0.0:8000
+2025-09-14 11:05:14,253 - __main__ - INFO - Режим отладки: False
+2025-09-14 11:05:14,253 - __main__ - INFO - Языки OCR: ['ru', 'en']
+2025-09-14 11:05:14,253 - __main__ - INFO - GPU для OCR: False
+2025-09-14 11:05:18,043 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 11:05:20,001 - ocr_service - INFO - EasyOCR инициализирован для языков: ['ru', 'en']
+2025-09-14 11:05:57,647 - main - ERROR - Ошибка при обработке документа: 
+2025-09-14 11:06:19,240 - noise_handler - ERROR - Ошибка конвертации байтов в изображение: cannot identify image file <_io.BytesIO object at 0x0000019E3BA8B830>
+2025-09-14 11:06:19,240 - noise_handler - ERROR - Ошибка при очистке изображения: cannot identify image file <_io.BytesIO object at 0x0000019E3BA8B830>
+2025-09-14 11:06:19,240 - ocr_service - ERROR - Ошибка конвертации байтов в изображение: cannot identify image file <_io.BytesIO object at 0x0000019E3BA8B830>
+2025-09-14 11:06:20,171 - ocr_service - INFO - Извлечено 0 символов текста
+2025-09-14 11:06:31,013 - noise_handler - ERROR - Ошибка конвертации байтов в изображение: cannot identify image file <_io.BytesIO object at 0x0000019E3B74F650>
+2025-09-14 11:06:31,013 - noise_handler - ERROR - Ошибка при очистке изображения: cannot identify image file <_io.BytesIO object at 0x0000019E3B74F650>
+2025-09-14 11:06:31,013 - ocr_service - ERROR - Ошибка конвертации байтов в изображение: cannot identify image file <_io.BytesIO object at 0x0000019E3B74F650>
+2025-09-14 11:06:31,096 - ocr_service - INFO - Извлечено 0 символов текста
+2025-09-14 11:06:44,786 - main - ERROR - Ошибка при обработке документа: 
+2025-09-14 11:08:26,410 - __main__ - INFO - Запуск OCR Quality Assessment API v1.0.0
+2025-09-14 11:08:26,410 - __main__ - INFO - Сервер будет доступен по адресу: http://0.0.0.0:8000
+2025-09-14 11:08:26,410 - __main__ - INFO - Режим отладки: False
+2025-09-14 11:08:26,410 - __main__ - INFO - Языки OCR: ['ru', 'en']
+2025-09-14 11:08:26,410 - __main__ - INFO - GPU для OCR: False
+2025-09-14 11:08:31,137 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 11:08:33,065 - ocr_service - INFO - EasyOCR инициализирован для языков: ['ru', 'en']
+2025-09-14 11:08:41,694 - __main__ - INFO - Запуск OCR Quality Assessment API v1.0.0
+2025-09-14 11:08:41,694 - __main__ - INFO - Сервер будет доступен по адресу: http://0.0.0.0:8000
+2025-09-14 11:08:41,694 - __main__ - INFO - Режим отладки: False
+2025-09-14 11:08:41,694 - __main__ - INFO - Языки OCR: ['ru', 'en']
+2025-09-14 11:08:41,694 - __main__ - INFO - GPU для OCR: False
+2025-09-14 11:08:45,585 - easyocr.easyocr - WARNING - Using CPU. Note: This module is much faster with a GPU.
+2025-09-14 11:08:47,505 - ocr_service - INFO - EasyOCR инициализирован для языков: ['ru', 'en']
+2025-09-14 11:09:02,894 - pdf_processor - INFO - Извлечено 35152 символов текста из PDF
+2025-09-14 11:09:02,894 - main - INFO - Обработан PDF файл: 355C.pdf
