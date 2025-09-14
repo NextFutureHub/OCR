@@ -1,4 +1,5 @@
 import easyocr
+import pytesseract
 import cv2
 import numpy as np
 from PIL import Image
@@ -23,19 +24,13 @@ class OCRService:
     def _initialize_reader(self):
         """Инициализация EasyOCR reader"""
         try:
-            # Инициализируем с улучшенными параметрами для лучшего качества
+            # Инициализируем с приоритетом русского языка
             self.reader = easyocr.Reader(
-                self.languages, 
+                ['ru', 'en'],  # Русский первым для приоритета
                 gpu=False,
-                model_storage_directory=None,
-                user_network_directory=None,
-                download_enabled=True,
-                detector=True,
-                recognizer=True,
-                verbose=False,
-                quantize=True
+                verbose=False
             )
-            logger.info(f"EasyOCR инициализирован для языков: {self.languages} с улучшенными параметрами")
+            logger.info(f"EasyOCR инициализирован для языков: ['ru', 'en'] с приоритетом русского")
         except Exception as e:
             logger.error(f"Ошибка инициализации EasyOCR: {str(e)}")
             raise
@@ -59,20 +54,94 @@ class OCRService:
                 logger.warning("Получено пустое изображение")
                 return ""
             
-            # Предобработка изображения
-            processed_image = self._preprocess_image(image)
-            
-            # OCR распознавание с улучшенными параметрами для русского языка
-            results = self.reader.readtext(
-                processed_image,
-                width_ths=0.7,
-                height_ths=0.7,
-                paragraph=False,
-                detail=1
-            )
-            
-            # Извлечение текста
-            extracted_text = self._extract_text_from_results(results)
+            # Собираем набор изображений-кандидатов (варианты предобработки и поворотов)
+            candidates: List[np.ndarray] = []
+
+            # Вариант 1: базовая предобработка
+            base = self._preprocess_image(image)
+            candidates.append(base)
+
+            # Вариант 2: инверсия
+            try:
+                inv = cv2.bitwise_not(base)
+                candidates.append(inv)
+            except Exception:
+                pass
+
+            # Вариант 3: адаптивная бинаризация
+            try:
+                adaptive = cv2.adaptiveThreshold(
+                    cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image,
+                    255,
+                    cv2.ADAPTIVE_THRESH_MEAN_C,
+                    cv2.THRESH_BINARY,
+                    15,
+                    10,
+                )
+                candidates.append(adaptive)
+            except Exception:
+                pass
+
+            # Повороты
+            rotation_angles = [0, 90, 180, 270]
+            # Пытаемся определить ориентацию через OSD
+            try:
+                osd = pytesseract.image_to_osd(Image.fromarray(base))
+                import re as _re
+                m = _re.search(r"Rotate: (\d+)", osd)
+                if m:
+                    angle = int(m.group(1)) % 360
+                    if angle not in rotation_angles:
+                        rotation_angles.append(angle)
+            except Exception:
+                pass
+
+            def rotate(img: np.ndarray, angle: int) -> np.ndarray:
+                if angle % 360 == 0:
+                    return img
+                (h, w) = img.shape[:2]
+                center = (w // 2, h // 2)
+                M = cv2.getRotationMatrix2D(center, angle, 1.0)
+                return cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+
+            # Оцениваем все комбинации и выбираем лучший текст
+            best_text = ""
+            best_score = -1.0
+
+            for cand in candidates:
+                for ang in rotation_angles:
+                    img_rot = rotate(cand, ang)
+
+                    # EasyOCR
+                    try:
+                        res_easy = self.reader.readtext(
+                            img_rot,
+                            width_ths=0.7,
+                            height_ths=0.7,
+                            paragraph=False,
+                            detail=1,
+                        )
+                        text_easy = self._extract_text_from_results(res_easy)
+                        score_easy = self._score_text(text_easy)
+                        if score_easy > best_score:
+                            best_text, best_score = text_easy, score_easy
+                    except Exception:
+                        pass
+
+                    # Tesseract (несколько конфигураций psm)
+                    for psm in (6, 4):
+                        try:
+                            pil_img = Image.fromarray(img_rot)
+                            text_tess = pytesseract.image_to_string(
+                                pil_img, lang='rus+eng', config=f'--oem 1 --psm {psm}'
+                            )
+                        except Exception:
+                            text_tess = ''
+                        score_tess = self._score_text(text_tess)
+                        if score_tess > best_score:
+                            best_text, best_score = text_tess, score_tess
+
+            extracted_text = best_text
             
             logger.info(f"Извлечено {len(extracted_text)} символов текста")
             return extracted_text
@@ -81,6 +150,22 @@ class OCRService:
             logger.error(f"Ошибка при извлечении текста: {str(e)}")
             # Возвращаем пустую строку вместо исключения
             return ""
+
+    def _score_text(self, text: str) -> float:
+        """Скоринг качества распознанного текста.
+        Учитывает длину, долю кириллицы и плотность слов.
+        """
+        if not text:
+            return 0.0
+        num_alpha = sum(ch.isalpha() for ch in text)
+        if num_alpha == 0:
+            return 0.0
+        cyr = sum('а' <= ch.lower() <= 'я' or ch in 'ёй' for ch in text)
+        cyr_ratio = cyr / max(1, num_alpha)
+        words = [w for w in text.split() if any(ch.isalpha() for ch in w)]
+        word_density = len(words) / max(1, len(text) / 25)  # ~25 chars per word
+        length_score = min(len(text) / 1000.0, 1.0)
+        return 2.0 * cyr_ratio + 1.0 * word_density + 0.5 * length_score
     
     def extract_text_with_confidence(self, image_data: bytes, min_confidence: float = 0.5) -> List[Dict[str, Any]]:
         """
@@ -215,8 +300,10 @@ class OCRService:
         try:
             texts = []
             for (bbox, text, confidence) in results:
-                if confidence > 0.3:  # Фильтрация по уверенности
-                    texts.append(text.strip())
+                if confidence > 0.4:  # Повышаем порог уверенности
+                    # Применяем постобработку для исправления ошибок OCR
+                    corrected_text = self._correct_ocr_errors(text.strip())
+                    texts.append(corrected_text)
             
             # Объединение текста с сохранением порядка
             full_text = ' '.join(texts)
@@ -226,6 +313,64 @@ class OCRService:
         except Exception as e:
             logger.error(f"Ошибка извлечения текста из результатов: {str(e)}")
             return ""
+    
+    def _correct_ocr_errors(self, text: str) -> str:
+        """
+        Исправляет распространенные ошибки OCR для русского текста
+        
+        Args:
+            text: Исходный текст с ошибками OCR
+            
+        Returns:
+            Исправленный текст
+        """
+        try:
+            # Словарь для исправления типичных ошибок OCR русского текста
+            corrections = {
+                # Частые замены латинских символов на кириллические
+                'a': 'а', 'A': 'А', 'B': 'В', 'C': 'С', 'E': 'Е', 'H': 'Н',
+                'K': 'К', 'M': 'М', 'O': 'О', 'P': 'Р', 'T': 'Т', 'X': 'Х',
+                'Y': 'У', 'c': 'с', 'e': 'е', 'o': 'о', 'p': 'р', 'x': 'х',
+                'y': 'у', 'r': 'г', 'u': 'и', 'n': 'п', 'b': 'б', 'd': 'д',
+                '6': 'б', '9': 'я', 'I': 'І', 'l': 'л', '1': 'І',
+                
+                # Исправление частых слов и фраз
+                'TOO': 'ТОО', 'OOO': 'ООО', 'LLC': 'ЛЛС',
+                'AOBOP': 'ДОГОВОР', 'roBoр': 'ДОГОВОР', 'AoroBop': 'Договор',
+                'KyrrJrrr': 'Кыргыз', 'Anruarrr': 'Алматы', 'Anruarr': 'Алматы',
+                'AoroBopa': 'Договора', 'Cropourr': 'Сторон', 'Cropon': 'Сторон',
+                'rpoAalrur': 'рамочный', 'O6oy4onauus': 'обслуживание',
+                'aKaзчик': 'Заказчик', 'oMnaния': 'Компания', 'омпания': 'Компания',
+                'ТОО': 'ТОО', 'редприятие': 'Предприятие', 'едприятие': 'Предприятие',
+                'редмет': 'Предмет', 'оимость': 'Стоимость', 'Tоимость': 'Стоимость',
+            }
+            
+            corrected = text
+            
+            # Применяем исправления
+            for wrong, correct in corrections.items():
+                corrected = corrected.replace(wrong, correct)
+            
+            # Дополнительные правила для русского текста
+            import re
+            
+            # Исправляем смешанные слова (латиница + кириллица)
+            mixed_words = re.findall(r'\b[a-zA-Zа-яё]+\b', corrected)
+            for word in mixed_words:
+                if any(char in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' for char in word) and \
+                   any(char in 'абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ' for char in word):
+                    # Пытаемся исправить смешанное слово
+                    fixed_word = word
+                    for lat, cyr in corrections.items():
+                        if len(lat) == 1 and len(cyr) == 1:  # Только одиночные символы
+                            fixed_word = fixed_word.replace(lat, cyr)
+                    corrected = corrected.replace(word, fixed_word)
+            
+            return corrected
+            
+        except Exception as e:
+            logger.error(f"Ошибка исправления OCR: {str(e)}")
+            return text
     
     def extract_text_with_columns(self, image_data: bytes) -> Dict[str, Any]:
         """
