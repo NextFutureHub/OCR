@@ -4,14 +4,19 @@ import { useState } from 'react';
 import { parsePdf, summarizeText } from './actions';
 import { useToast } from '@/hooks/use-toast';
 import { DocUpload } from '@/components/doc-upload';
+import { OCRUpload } from '@/components/ocr-upload';
+import { OCRMetrics } from '@/components/ocr-metrics';
+import { OCRColumnsDisplay } from '@/components/ocr-columns-display';
 import { ChatPanel } from '@/components/chat-panel';
 import { Logo } from '@/components/icons';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FileText, ChevronLeft, ChevronRight, FileImage, BarChart3, Columns } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { type OCRResponse } from '@/lib/ocr-api';
 
 type Document = {
   name: string;
@@ -25,6 +30,8 @@ export default function Home() {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [chatKey, setChatKey] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
+  const [ocrResult, setOcrResult] = useState<OCRResponse | null>(null);
+  const [activeTab, setActiveTab] = useState('text');
   const { toast } = useToast();
 
   const handleFileUpload = async (file: File) => {
@@ -124,11 +131,18 @@ export default function Home() {
     }
   };
 
+  const handleOCRComplete = (result: OCRResponse) => {
+    setOcrResult(result);
+    setActiveTab('ocr');
+  };
+
   const resetApp = () => {
     setDoc(null);
     setSummary(null);
     setIsSummarizing(false);
     setCurrentPage(0);
+    setOcrResult(null);
+    setActiveTab('text');
   };
   
   const goToPrevPage = () => {
@@ -151,9 +165,26 @@ export default function Home() {
       </header>
 
       <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
-        {!doc ? (
-          <DocUpload onFileUpload={handleFileUpload} isLoading={isSummarizing} />
-        ) : (
+        {!doc && !ocrResult ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-4xl">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="text" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Текстовые документы
+              </TabsTrigger>
+              <TabsTrigger value="ocr" className="flex items-center gap-2">
+                <FileImage className="h-4 w-4" />
+                OCR обработка
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="text" className="mt-6">
+              <DocUpload onFileUpload={handleFileUpload} isLoading={isSummarizing} />
+            </TabsContent>
+            <TabsContent value="ocr" className="mt-6">
+              <OCRUpload onOCRComplete={handleOCRComplete} />
+            </TabsContent>
+          </Tabs>
+        ) : doc ? (
           <div className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 flex-grow min-h-0">
             <Card className="flex flex-col h-full max-h-[calc(100vh-12rem)] bg-card/80 backdrop-blur-sm">
               <CardHeader className='pb-4'>
@@ -202,7 +233,60 @@ export default function Home() {
                 <ChatPanel key={chatKey} documentText={doc.text} />
             </div>
           </div>
-        )}
+        ) : ocrResult ? (
+          <div className="w-full max-w-7xl mx-auto space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <FileImage className="h-6 w-6" />
+                Результаты OCR обработки
+              </h2>
+              <Button variant="outline" onClick={resetApp}>
+                Новый документ
+              </Button>
+            </div>
+            
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="text" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Текст и структура
+                </TabsTrigger>
+                <TabsTrigger value="metrics" className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Метрики качества
+                </TabsTrigger>
+                <TabsTrigger value="columns" className="flex items-center gap-2">
+                  <Columns className="h-4 w-4" />
+                  Столбцы и страницы
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="text" className="mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Извлеченный текст</CardTitle>
+                    <CardDescription>
+                      Текст, извлеченный с помощью OCR технологии
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="p-4 bg-muted rounded-lg max-h-96 overflow-y-auto">
+                      <p className="text-sm whitespace-pre-wrap">{ocrResult.extracted_text}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="metrics" className="mt-6">
+                <OCRMetrics result={ocrResult} />
+              </TabsContent>
+              
+              <TabsContent value="columns" className="mt-6">
+                <OCRColumnsDisplay result={ocrResult} />
+              </TabsContent>
+            </Tabs>
+          </div>
+        ) : null}
       </main>
     </div>
   );

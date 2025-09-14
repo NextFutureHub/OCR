@@ -40,6 +40,127 @@ class PDFProcessor:
             logger.error(f"Ошибка при извлечении текста из PDF: {str(e)}")
             return ""
     
+    def extract_text_with_pages_and_columns(self, pdf_data: bytes) -> dict:
+        """
+        Извлечение текста из PDF с анализом страниц и столбцов
+        
+        Args:
+            pdf_data: Байты PDF файла
+            
+        Returns:
+            Словарь с текстом, страницами и столбцами
+        """
+        try:
+            # Получаем информацию о PDF
+            pdf_info = self.get_pdf_info(pdf_data)
+            
+            # Сначала пытаемся извлечь текст напрямую из PDF
+            direct_text = self._extract_text_direct(pdf_data)
+            
+            if direct_text and len(direct_text.strip()) > 10:
+                logger.info(f"Извлечен текст напрямую из PDF: {len(direct_text)} символов")
+                return {
+                    'full_text': direct_text,
+                    'pages': [{
+                        'page_number': 1,
+                        'text': direct_text,
+                        'columns': [],
+                        'columns_count': 0,
+                        'has_multiple_columns': False
+                    }],
+                    'total_pages': 1,
+                    'has_multiple_columns': False,
+                    'pdf_info': pdf_info
+                }
+            
+            # Если прямого извлечения недостаточно, пытаемся конвертировать в изображения
+            logger.info("Прямое извлечение текста недостаточно, конвертируем в изображения")
+            images = self.convert_pdf_to_images(pdf_data)
+            
+            if not images:
+                logger.warning("Не удалось конвертировать PDF в изображения, используем прямое извлечение")
+                return {
+                    'full_text': direct_text or '',
+                    'pages': [{
+                        'page_number': 1,
+                        'text': direct_text or '',
+                        'columns': [],
+                        'columns_count': 0,
+                        'has_multiple_columns': False
+                    }],
+                    'total_pages': 1,
+                    'has_multiple_columns': False,
+                    'pdf_info': pdf_info
+                }
+            
+            # Импортируем OCR сервис
+            from ocr_service import OCRService
+            ocr_service = OCRService()
+            
+            pages_data = []
+            all_text = ""
+            has_multiple_columns = False
+            
+            for i, image in enumerate(images):
+                logger.info(f"Обработка страницы {i+1} из {len(images)}")
+                
+                # Конвертируем numpy array в байты
+                img_byte_arr = io.BytesIO()
+                pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+                pil_image.save(img_byte_arr, format='PNG')
+                img_byte_arr = img_byte_arr.getvalue()
+                
+                # Обрабатываем через OCR с анализом столбцов
+                page_result = ocr_service.extract_text_with_columns(img_byte_arr)
+                
+                page_data = {
+                    'page_number': i + 1,
+                    'text': page_result['full_text'],
+                    'columns': page_result['columns'],
+                    'columns_count': page_result['columns_count'],
+                    'has_multiple_columns': page_result['has_multiple_columns']
+                }
+                
+                pages_data.append(page_data)
+                all_text += page_result['full_text'] + "\n"
+                
+                if page_result['has_multiple_columns']:
+                    has_multiple_columns = True
+            
+            return {
+                'full_text': all_text.strip(),
+                'pages': pages_data,
+                'total_pages': len(pages_data),
+                'has_multiple_columns': has_multiple_columns,
+                'pdf_info': pdf_info
+            }
+            
+        except Exception as e:
+            logger.error(f"Ошибка при извлечении текста с анализом страниц и столбцов: {str(e)}")
+            # В случае ошибки, пытаемся хотя бы извлечь текст напрямую
+            try:
+                direct_text = self._extract_text_direct(pdf_data)
+                return {
+                    'full_text': direct_text or '',
+                    'pages': [{
+                        'page_number': 1,
+                        'text': direct_text or '',
+                        'columns': [],
+                        'columns_count': 0,
+                        'has_multiple_columns': False
+                    }],
+                    'total_pages': 1,
+                    'has_multiple_columns': False,
+                    'pdf_info': {'pages': 1}
+                }
+            except:
+                return {
+                    'full_text': '',
+                    'pages': [],
+                    'total_pages': 0,
+                    'has_multiple_columns': False
+                }
+    
     def _extract_text_direct(self, pdf_data: bytes) -> str:
         """Прямое извлечение текста из PDF"""
         try:

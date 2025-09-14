@@ -41,6 +41,20 @@ class OCRRequest(BaseModel):
     expected_fields: Optional[List[str]] = None
     schema: Optional[Dict[str, Any]] = None
 
+class ColumnData(BaseModel):
+    text: str
+    side: str  # 'left' or 'right'
+    language: str
+    items_count: int
+    confidence_avg: float
+
+class PageData(BaseModel):
+    page_number: int
+    text: str
+    columns: List[ColumnData]
+    columns_count: int
+    has_multiple_columns: bool
+
 class OCRResponse(BaseModel):
     extracted_text: str
     structured_data: Dict[str, Any]
@@ -48,6 +62,12 @@ class OCRResponse(BaseModel):
     json_validity: bool
     schema_consistency: bool
     processing_time: float
+    # Новые поля для столбцов и страниц
+    pages: Optional[List[PageData]] = None
+    total_pages: Optional[int] = None
+    has_multiple_columns: Optional[bool] = None
+    columns: Optional[List[ColumnData]] = None
+    columns_count: Optional[int] = None
 
 @app.post("/ocr/process", response_model=OCRResponse)
 async def process_document(
@@ -88,14 +108,28 @@ async def process_document(
         schema_dict = json.loads(schema) if schema else None
         
         # Определяем тип файла и обрабатываем соответственно
+        pages_data = None
+        total_pages = None
+        has_multiple_columns = None
+        columns_data = None
+        columns_count = None
+        
         if file_extension == '.pdf':
-            # Обработка PDF файла
-            extracted_text = pdf_processor.extract_text_from_pdf(image_data)
-            logger.info(f"Обработан PDF файл: {file.filename}")
+            # Обработка PDF файла с анализом страниц и столбцов
+            pdf_result = pdf_processor.extract_text_with_pages_and_columns(image_data)
+            extracted_text = pdf_result['full_text']
+            pages_data = pdf_result['pages']
+            total_pages = pdf_result['total_pages']
+            has_multiple_columns = pdf_result['has_multiple_columns']
+            logger.info(f"Обработан PDF файл: {file.filename}, страниц: {total_pages}")
         else:
-            # Обработка изображения
-            extracted_text = ocr_service.extract_text(image_data)
-            logger.info(f"Обработано изображение: {file.filename}")
+            # Обработка изображения с анализом столбцов
+            ocr_result = ocr_service.extract_text_with_columns(image_data)
+            extracted_text = ocr_result['full_text']
+            columns_data = ocr_result['columns']
+            columns_count = ocr_result['columns_count']
+            has_multiple_columns = ocr_result['has_multiple_columns']
+            logger.info(f"Обработано изображение: {file.filename}, столбцов: {columns_count}")
         
         # Извлечение структурированных данных
         structured_data = data_extractor.extract_fields(extracted_text, expected_fields_list)
@@ -119,7 +153,12 @@ async def process_document(
             metrics=metrics,
             json_validity=json_validity,
             schema_consistency=schema_consistency,
-            processing_time=processing_time
+            processing_time=processing_time,
+            pages=pages_data,
+            total_pages=total_pages,
+            has_multiple_columns=has_multiple_columns,
+            columns=columns_data,
+            columns_count=columns_count
         )
         
     except Exception as e:
