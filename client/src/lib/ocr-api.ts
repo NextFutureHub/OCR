@@ -2,7 +2,7 @@
  * OCR API интеграция для работы с бэкенд сервисом
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_OCR_API_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000';
 
 export interface ColumnData {
   text: string;
