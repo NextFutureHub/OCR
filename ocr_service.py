@@ -23,8 +23,19 @@ class OCRService:
     def _initialize_reader(self):
         """Инициализация EasyOCR reader"""
         try:
-            self.reader = easyocr.Reader(self.languages, gpu=False)
-            logger.info(f"EasyOCR инициализирован для языков: {self.languages}")
+            # Инициализируем с улучшенными параметрами для лучшего качества
+            self.reader = easyocr.Reader(
+                self.languages, 
+                gpu=False,
+                model_storage_directory=None,
+                user_network_directory=None,
+                download_enabled=True,
+                detector=True,
+                recognizer=True,
+                verbose=False,
+                quantize=True
+            )
+            logger.info(f"EasyOCR инициализирован для языков: {self.languages} с улучшенными параметрами")
         except Exception as e:
             logger.error(f"Ошибка инициализации EasyOCR: {str(e)}")
             raise
@@ -51,8 +62,14 @@ class OCRService:
             # Предобработка изображения
             processed_image = self._preprocess_image(image)
             
-            # OCR распознавание
-            results = self.reader.readtext(processed_image)
+            # OCR распознавание с улучшенными параметрами для русского языка
+            results = self.reader.readtext(
+                processed_image,
+                width_ths=0.7,
+                height_ths=0.7,
+                paragraph=False,
+                detail=1
+            )
             
             # Извлечение текста
             extracted_text = self._extract_text_from_results(results)
@@ -135,6 +152,7 @@ class OCRService:
     def _preprocess_image(self, image: np.ndarray) -> np.ndarray:
         """
         Предобработка изображения для улучшения качества OCR
+        Оптимизировано для русского текста
         
         Args:
             image: Исходное изображение
@@ -149,17 +167,36 @@ class OCRService:
             else:
                 gray = image.copy()
             
-            # Увеличение контраста
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-            enhanced = clahe.apply(gray)
+            # Значительное увеличение размера для мелкого текста
+            height, width = gray.shape
+            if height < 3000 or width < 3000:
+                scale_factor = max(3000/height, 3000/width)
+                new_width = int(width * scale_factor)
+                new_height = int(height * scale_factor)
+                gray = cv2.resize(gray, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
             
-            # Удаление шума
-            denoised = cv2.medianBlur(enhanced, 3)
+            # Нормализация освещения
+            normalized = cv2.convertScaleAbs(gray, alpha=1.2, beta=10)
             
-            # Бинаризация
-            _, binary = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            # Гауссово размытие для сглаживания
+            blurred = cv2.GaussianBlur(normalized, (3, 3), 0)
             
-            return binary
+            # Улучшение контраста специально для текста
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(16,16))
+            enhanced = clahe.apply(blurred)
+            
+            # Простая бинаризация по Оцу (часто лучше для текста)
+            _, binary = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            # Инвертируем если нужно (темный текст на светлом фоне)
+            if cv2.mean(binary)[0] < 127:
+                binary = cv2.bitwise_not(binary)
+            
+            # Легкая морфологическая обработка для очистки
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+            cleaned = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=1)
+            
+            return cleaned
             
         except Exception as e:
             logger.error(f"Ошибка предобработки изображения: {str(e)}")
@@ -268,13 +305,12 @@ class OCRService:
             if len(filtered_results) < 2:
                 return []
             
-            # Вычисляем X-координаты всех элементов
+            # Сначала пытаемся найти столбцы по X-координатам
             x_coords = []
             for (bbox, text, confidence) in filtered_results:
                 avg_x = sum([point[0] for point in bbox]) / len(bbox)
                 x_coords.append(avg_x)
             
-            # Сортируем X-координаты
             x_coords.sort()
             
             # Находим разрыв между столбцами
@@ -288,50 +324,111 @@ class OCRService:
                     gap_index = i
             
             # Если разрыв достаточно большой, считаем что есть два столбца
-            min_gap_threshold = image_width * 0.2  # 20% от ширины изображения
+            min_gap_threshold = image_width * 0.15  # 15% от ширины изображения
             
-            if max_gap < min_gap_threshold:
-                # Считаем что это один столбец
-                return []
+            if max_gap >= min_gap_threshold:
+                # Разделяем на два столбца по X-координатам
+                split_x = (x_coords[gap_index] + x_coords[gap_index + 1]) / 2
+                
+                left_column = []
+                right_column = []
+                
+                for (bbox, text, confidence) in filtered_results:
+                    avg_x = sum([point[0] for point in bbox]) / len(bbox)
+                    
+                    if avg_x < split_x:
+                        left_column.append((bbox, text, confidence, avg_x))
+                    else:
+                        right_column.append((bbox, text, confidence, avg_x))
+                
+                columns_info = []
+                
+                # Левый столбец
+                if left_column:
+                    left_column.sort(key=lambda x: x[3])  # Сортировка по X
+                    columns_info.append({
+                        'side': 'left',
+                        'x_range': (0, split_x),
+                        'items': left_column,
+                        'language': self._detect_language([item[1] for item in left_column])
+                    })
+                
+                # Правый столбец
+                if right_column:
+                    right_column.sort(key=lambda x: x[3])  # Сортировка по X
+                    columns_info.append({
+                        'side': 'right',
+                        'x_range': (split_x, image_width),
+                        'items': right_column,
+                        'language': self._detect_language([item[1] for item in right_column])
+                    })
+                
+                logger.info(f"Обнаружено {len(columns_info)} столбцов по X-координатам, разрыв: {max_gap:.1f}px")
+                return columns_info
             
-            # Разделяем на два столбца
-            split_x = (x_coords[gap_index] + x_coords[gap_index + 1]) / 2
+            # Если разрыв недостаточный, пытаемся найти столбцы по языкам
+            logger.info("Недостаточный разрыв по X-координатам, анализируем по языкам")
             
-            left_column = []
-            right_column = []
+            # Группируем по языкам
+            russian_items = []
+            english_items = []
             
             for (bbox, text, confidence) in filtered_results:
-                avg_x = sum([point[0] for point in bbox]) / len(bbox)
+                language = self._detect_language([text])
+                if language == 'ru':
+                    avg_x = sum([point[0] for point in bbox]) / len(bbox)
+                    russian_items.append((bbox, text, confidence, avg_x))
+                elif language == 'en':
+                    avg_x = sum([point[0] for point in bbox]) / len(bbox)
+                    english_items.append((bbox, text, confidence, avg_x))
+            
+            # Если есть элементы на обоих языках, создаем столбцы
+            if russian_items and english_items:
+                columns_info = []
                 
-                if avg_x < split_x:
-                    left_column.append((bbox, text, confidence, avg_x))
+                # Сортируем по X-координатам
+                russian_items.sort(key=lambda x: x[3])
+                english_items.sort(key=lambda x: x[3])
+                
+                # Определяем, какой язык слева, какой справа
+                russian_avg_x = sum([item[3] for item in russian_items]) / len(russian_items)
+                english_avg_x = sum([item[3] for item in english_items]) / len(english_items)
+                
+                if russian_avg_x < english_avg_x:
+                    # Русский слева, английский справа
+                    columns_info.append({
+                        'side': 'left',
+                        'x_range': (0, image_width // 2),
+                        'items': russian_items,
+                        'language': 'ru'
+                    })
+                    columns_info.append({
+                        'side': 'right',
+                        'x_range': (image_width // 2, image_width),
+                        'items': english_items,
+                        'language': 'en'
+                    })
                 else:
-                    right_column.append((bbox, text, confidence, avg_x))
+                    # Английский слева, русский справа
+                    columns_info.append({
+                        'side': 'left',
+                        'x_range': (0, image_width // 2),
+                        'items': english_items,
+                        'language': 'en'
+                    })
+                    columns_info.append({
+                        'side': 'right',
+                        'x_range': (image_width // 2, image_width),
+                        'items': russian_items,
+                        'language': 'ru'
+                    })
+                
+                logger.info(f"Обнаружено {len(columns_info)} столбцов по языкам")
+                return columns_info
             
-            columns_info = []
-            
-            # Левый столбец
-            if left_column:
-                left_column.sort(key=lambda x: x[3])  # Сортировка по X
-                columns_info.append({
-                    'side': 'left',
-                    'x_range': (0, split_x),
-                    'items': left_column,
-                    'language': self._detect_language([item[1] for item in left_column])
-                })
-            
-            # Правый столбец
-            if right_column:
-                right_column.sort(key=lambda x: x[3])  # Сортировка по X
-                columns_info.append({
-                    'side': 'right',
-                    'x_range': (split_x, image_width),
-                    'items': right_column,
-                    'language': self._detect_language([item[1] for item in right_column])
-                })
-            
-            logger.info(f"Обнаружено {len(columns_info)} столбцов, разрыв: {max_gap:.1f}px")
-            return columns_info
+            # Если ничего не найдено, возвращаем пустой список
+            logger.info("Столбцы не обнаружены")
+            return []
             
         except Exception as e:
             logger.error(f"Ошибка анализа столбцов: {str(e)}")
