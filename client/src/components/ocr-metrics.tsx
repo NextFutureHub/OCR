@@ -168,11 +168,14 @@ export function OCRMetrics({ result }: OCRMetricsProps) {
             <div>
               <span className="font-medium">Средняя точность:</span>
               <span className="ml-2">
-                {Object.values(metrics)
-                  .filter(v => typeof v === 'number')
-                  .reduce((a, b) => a + b, 0) / 
-                  Object.values(metrics).filter(v => typeof v === 'number').length * 100
-                  .toFixed(1)}%
+                {(() => {
+                  const numeric = Object.values(metrics).filter(
+                    (v): v is number => typeof v === 'number' && isFinite(v as number)
+                  );
+                  if (numeric.length === 0) return '—';
+                  const avg = numeric.reduce((a, b) => a + b, 0) / numeric.length;
+                  return `${(avg * 100).toFixed(1)}%`;
+                })()}
               </span>
             </div>
           </div>
