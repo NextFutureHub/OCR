@@ -27,6 +27,8 @@
 
 ## Установка
 
+### Backend (OCR API)
+
 1. Установите зависимости:
 ```bash
 pip install -r requirements.txt
@@ -38,6 +40,73 @@ python main.py
 ```
 
 API будет доступен по адресу: `http://localhost:8000`
+
+### Frontend (Web Interface)
+
+1. Перейдите в папку клиента:
+```bash
+cd client
+```
+
+2. Установите зависимости:
+```bash
+npm install
+```
+
+3. Запустите фронтенд:
+```bash
+npm run dev
+```
+
+Веб-интерфейс будет доступен по адресу: `http://localhost:9002`
+
+### Полный запуск системы
+
+1. **Терминал 1** - Backend:
+```bash
+python main.py
+```
+
+2. **Терминал 2** - Frontend:
+```bash
+cd client
+npm run dev
+```
+
+3. Откройте браузер: `http://localhost:9002`
+
+## Веб-интерфейс
+
+Система включает современный веб-интерфейс на Next.js с следующими возможностями:
+
+### Основные функции
+- **Загрузка файлов**: Drag & Drop интерфейс для PDF и изображений
+- **OCR обработка**: Автоматическое распознавание текста с метриками качества
+- **Разделение по столбцам**: Умное определение двуязычных документов
+- **Постраничный просмотр**: Для PDF файлов с сохранением структуры
+- **Метрики качества**: Визуализация CER, WER, точности распознавания
+- **Адаптивный дизайн**: Работает на всех устройствах
+
+### Технологии фронтенда
+- **Next.js 14** - React фреймворк
+- **TypeScript** - типизация
+- **Tailwind CSS** - стилизация
+- **Radix UI** - компоненты интерфейса
+- **Shadcn/ui** - дизайн-система
+
+
+### Docker (локально)
+
+```bash
+# Backend
+docker build -t ocr-backend .
+docker run -p 8000:8080 ocr-backend
+
+# Frontend  
+cd client
+docker build -t ocr-frontend .
+docker run -p 3000:8080 -e NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 ocr-frontend
+```
 
 ## Использование
 
@@ -102,7 +171,23 @@ API будет доступен по адресу: `http://localhost:8000`
 
 ## Примеры использования
 
-### Обработка документа
+### Веб-интерфейс
+
+1. **Откройте** `http://localhost:9002` в браузере
+2. **Перейдите** на вкладку "OCR обработка"
+3. **Загрузите файл**:
+   - Перетащите PDF или изображение в область загрузки
+   - Или нажмите "Выбрать файл"
+4. **Дождитесь обработки** - система покажет прогресс
+5. **Просмотрите результаты**:
+   - Извлеченный текст
+   - Метрики качества (CER, WER, точность)
+   - Разделение по столбцам (если обнаружено)
+   - Постраничный просмотр (для PDF)
+
+### API (программное использование)
+
+#### Обработка документа
 ```python
 import requests
 
@@ -119,7 +204,7 @@ with open('document.jpg', 'rb') as f:
     print(f"Извлеченные данные: {result['structured_data']}")
 ```
 
-### Обработка зашумленного документа
+#### Обработка зашумленного документа
 ```python
 import requests
 
@@ -131,13 +216,44 @@ with open('noisy_document.jpg', 'rb') as f:
     print(f"Текст после очистки: {result['extracted_text']}")
 ```
 
+#### Обработка PDF с колонками
+```python
+import requests
+
+with open('bilingual_document.pdf', 'rb') as f:
+    files = {'file': f}
+    response = requests.post('http://localhost:8000/ocr/process', files=files)
+    result = response.json()
+    
+    print(f"Страниц: {result['total_pages']}")
+    print(f"Колонок: {result['columns_count']}")
+    
+    for page in result['pages']:
+        print(f"Страница {page['page_number']}:")
+        for col_idx, column in enumerate(page['columns']):
+            print(f"  Колонка {col_idx + 1}: {column['text'][:100]}...")
+```
+
 ## Архитектура
 
-- `main.py` - основной FastAPI сервер
-- `ocr_service.py` - сервис OCR с EasyOCR
-- `metrics_calculator.py` - расчет метрик качества
+### Backend (Python/FastAPI)
+- `main.py` - основной FastAPI сервер с API endpoints
+- `ocr_service.py` - сервис OCR с EasyOCR и Tesseract
+- `pdf_processor.py` - обработка PDF файлов и определение колонок
+- `metrics_calculator.py` - расчет метрик качества OCR
 - `data_extractor.py` - извлечение структурированных данных
 - `noise_handler.py` - обработка зашумленных изображений
+
+### Frontend (Next.js/React)
+- `client/src/app/page.tsx` - главная страница с вкладками
+- `client/src/components/ocr-upload.tsx` - компонент загрузки файлов
+- `client/src/components/ocr-metrics.tsx` - отображение метрик качества
+- `client/src/components/ocr-columns-display.tsx` - просмотр колонок и страниц
+- `client/src/lib/ocr-api.ts` - API клиент для взаимодействия с бэкендом
+
+### Docker
+- `Dockerfile` - контейнер для бэкенда (Python + системные зависимости)
+- `client/Dockerfile` - контейнер для фронтенда (Node.js + Next.js)
 
 ## Метрики качества
 
