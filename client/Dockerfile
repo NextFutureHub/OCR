@@ -16,6 +16,6 @@ ENV NODE_ENV=production \
     PORT=8080
 COPY --from=build /app ./
 EXPOSE 8080
-CMD ["npm", "run", "start", "--", "-p", "8080"]
+CMD ["sh", "-c", "npm run start -- -p ${PORT:-8080}"]
 
 
